@@ -31,9 +31,9 @@ import javax.imageio.*;
 ControlP5 cp5;  // Visual control panel
 PGraphicsOpenGL pgl;
 GL gl; 
+PolygonBlob poly = new PolygonBlob();  // declare custom PolygonBlob object (see class for more info)
 SimpleOpenNI kinect;  // declare SimpleOpenNI object
 BlobDetection theBlobDetection;  // declare BlobDetection object
-PolygonBlob poly = new PolygonBlob();  // declare custom PolygonBlob object (see class for more info)
 ToxiclibsSupport gfx; // ToxiclibsSupport for displaying polygons
 
 // Global variables
@@ -74,7 +74,7 @@ void setup() {
     .updateSize()
     ;
   kinect = new SimpleOpenNI(this);  // initialize SimpleOpenNI object
-  if (!kinect.enableScene()) {  // Check to see if the Kinect is available, quit otherwise
+  if (!kinect.enableDepth() || !kinect.enableUser()) {  // Check to see if the Kinect is available, quit otherwise
     println("No scene image");
     exit();
   }
@@ -90,17 +90,18 @@ void setup() {
 }
 
 void draw() {
+  setupgl();
   blendMode(REPLACE); // Replace the previous image, we have new things to draw
   image(bgImg,0,0); // Giving our effect a background to match
   kinect.update();  // Get fresh information from the Kinect
-  cam = kinect.sceneImage().get();  // Get information from the scene
+  cam = kinect.depthImage();  // Get information from the scene
   background(0);  
   IntVector userList = new IntVector();
   int nou = kinect.getNumberOfUsers();
   if (nou < nou_old) nou_old = nou;
   if (nou_old>0) {
     {
-      user1 = kinect.getUsersPixels(SimpleOpenNI.USERS_ALL);    // find out which pixels have users in them
+      user1 = kinect.userImage().pixels;    // find out which pixels have users in them
       blobs.pixels = user1 ;    // clean up blobs.pixels
       for (int   i = 0; i < user1.length; i++) {    // populate the pixels array from the sketch's current contents
         if (user1[i] != 0) {    // if the current pixel is on a user
@@ -125,11 +126,11 @@ void draw() {
 void setupgl()
 {
   pgl = (PGraphicsOpenGL) g;
-  GL gl = pgl.beginPGL().gl;  // JOGL's GL object
-  gl.glDisable(GL.GL_DEPTH_TEST);  // This fixes the overlap issue
-  gl.glEnable(GL.GL_BLEND);  // Turn on the blend mode
-  gl.glBlendFunc(GL.GL_SRC_ALPHA,GL.GL_ONE);  // Define the blend mode
-  gl.glClear(GL.GL_DEPTH_BUFFER_BIT);
+  PGL gl = pgl.beginPGL();  // JOGL's GL object
+  gl.disable(GL.GL_DEPTH_TEST);  // This fixes the overlap issue
+  gl.enable(GL.GL_BLEND);  // Turn on the blend mode
+  gl.blendFunc(GL.GL_SRC_ALPHA,GL.GL_ONE);  // Define the blend mode
+  gl.clear(GL.GL_DEPTH_BUFFER_BIT);
 }
 
 // A function to easily setup features required from the Kinect OpenNI interface
@@ -137,10 +138,10 @@ void setupgl()
 void setupKinect(SimpleOpenNI kinect)
 {
   kinect.setMirror(true);  // mirror the image to make the display more intuitive
-  kinect.enableUser(SimpleOpenNI.SKEL_PROFILE_NONE);  // We need to enable user tracking but do not use skeleton joints here
-  kinect.enableGesture(); // Enable Gesture tracking to be used to find the hand the first time
-  kinect.enableHands();   // Enable hand tracking to be used for "Share on Facebook" feature
-  kinect.addGesture("RaiseHand");  // Tell the kinect that we would like it to report a Raised Hand gesture
+  kinect.enableUser();  // We need to enable user tracking but do not use skeleton joints here
+  //kinect.enableGesture(); // Enable Gesture tracking to be used to find the hand the first time
+  kinect.enableHand();   // Enable hand tracking to be used for "Share on Facebook" feature
+  //kinect.addGesture("RaiseHand");  // Tell the kinect that we would like it to report a Raised Hand gesture
 }
 
 
@@ -154,13 +155,13 @@ void polyglow(ToxiclibsSupport gfx, PolygonBlob poly)
   scale(reScale);
   gfx.polygon2D(poly);
   blendMode(ADD);
-  dispimg = get();
+  dispImg = get();
   scale(1/reScale);
-  dispimg.resize(1600/4, 0);
-  dispimg.filter(BLUR, 2);
-  dispimg.resize(1600, 0);
+  dispImg.resize(1600/4, 0);
+  dispImg.filter(BLUR, 2);
+  dispImg.resize(1600, 0);
   tint(255, 180);
-  image(dispimg,0,0);
+  image(dispImg,0,0);
 }
 
 // SimpleOpenNI callback method when the Kinect "loses" a user
@@ -212,10 +213,10 @@ if(position.x>kinectWidth*0.8 && position.y>0.75*kinectHeight)
   new Poster(4);
   }
 }
-}oh wait, i'll ju
+}//oh wait, i'll ju
 
 void onDestroyHands(int handId, float time) {
-  kinect.addGesture("RaiseHand");
+  //kinect.addGesture("RaiseHand");
 }
 
 // -----------------------------------------------------------------
@@ -223,8 +224,8 @@ void onDestroyHands(int handId, float time) {
 void onRecognizeGesture(String strGesture,PVector idPosition,PVector endPosition)
 {
   println("Recognized Gesture");
-  kinect.startTrackingHands(endPosition);
-  kinect.removeGesture("RaiseHand");
+  kinect.startTrackingHand(endPosition);
+  //kinect.removeGesture("RaiseHand");
 }
 
 // A method to post the image to your own server. Thanks a ton to philho for this

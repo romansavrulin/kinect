@@ -66,7 +66,7 @@ void setup() {
     .updateSize()
     ;
   kinect = new SimpleOpenNI(this);  // initialize SimpleOpenNI object
-  if (!kinect.enableScene()) {  // Check to see if the Kinect is available, quit otherwise
+  if (!kinect.enableDepth() || !kinect.enableUser()) {  // Check to see if the Kinect is available, quit otherwise
     println("No scene image");
     exit();
   }
@@ -82,11 +82,11 @@ void setup() {
 }
 
 void draw() {
-  setupgl();  // Setup the graphics layer
+  //setupgl();  // Setup the graphics layer
   blendMode(REPLACE); // Replace the previous image, we have new things to draw
   image(bgImg,0,0); // Giving our effect a background to match
   kinect.update();  // Get fresh information from the Kinect
-  cam = kinect.sceneImage().get();  // Get information from the scene
+  cam = kinect.depthImage();  // Get information from the scene
   blobs.copy(cam, 0, 0, cam.width, cam.height, 0, 0, blobs.width, blobs.height);  // copy the image into the smaller blob image for faster processing
   blobs.filter(BLUR);  // blur the blob image
   theBlobDetection.computeBlobs(blobs.pixels);  // detect the blobs
@@ -108,10 +108,10 @@ void draw() {
 void setupKinect(SimpleOpenNI kinect)
 {
   kinect.setMirror(true);  // mirror the image to make the display more intuitive
-  kinect.enableUser(SimpleOpenNI.SKEL_PROFILE_NONE);  // We need to enable user tracking but do not use skeleton joints here
-  kinect.enableGesture(); // Enable Gesture tracking to be used to find the hand the first time
-  kinect.enableHands();   // Enable hand tracking to be used for "Share on Facebook" feature
-  kinect.addGesture("RaiseHand");  // Tell the kinect that we would like it to report a Raised Hand gesture
+  kinect.enableUser();  // We need to enable user tracking but do not use skeleton joints here
+  //kinect.enableGesture(); // Enable Gesture tracking to be used to find the hand the first time
+  kinect.enableHand();   // Enable hand tracking to be used for "Share on Facebook" feature
+  //kinect.addGesture("RaiseHand");  // Tell the kinect that we would like it to report a Raised Hand gesture
 }
 
 // Create and initialize the particles that we need to represent users
@@ -165,11 +165,11 @@ void setRandomColors(int nthFrame) {
 void setupgl()
 {
   pgl = (PGraphicsOpenGL) g;
-  GL gl = pgl.beginPGL().gl;  // JOGL's GL object
-  gl.glDisable(GL.GL_DEPTH_TEST);  // This fixes the overlap issue
-  gl.glEnable(GL.GL_BLEND);  // Turn on the blend mode
-  gl.glBlendFunc(GL.GL_SRC_ALPHA,GL.GL_ONE);  // Define the blend mode
-  gl.glClear(GL.GL_DEPTH_BUFFER_BIT);
+  PGL gl = pgl.beginPGL();  // JOGL's GL object
+  gl.disable(GL.GL_DEPTH_TEST);  // This fixes the overlap issue
+  gl.enable(GL.GL_BLEND);  // Turn on the blend mode
+  gl.blendFunc(GL.GL_SRC_ALPHA,GL.GL_ONE);  // Define the blend mode
+  gl.clear(GL.GL_DEPTH_BUFFER_BIT);
 }
 
 // SimpleOpenNI callback method when the Kinect "loses" a user
@@ -224,7 +224,7 @@ if(position.x>kinectWidth*0.8 && position.y>0.75*kinectHeight)
 }
 
 void onDestroyHands(int handId, float time) {
-  kinect.addGesture("RaiseHand");
+  //kinect.addGesture("RaiseHand");
 }
 
 // -----------------------------------------------------------------
@@ -232,8 +232,8 @@ void onDestroyHands(int handId, float time) {
 void onRecognizeGesture(String strGesture,PVector idPosition,PVector endPosition)
 {
   println("Recognized Gesture");
-  kinect.startTrackingHands(endPosition);
-  kinect.removeGesture("RaiseHand");
+  kinect.startTrackingHand(endPosition);
+  //kinect.removeGesture("RaiseHand");
 }
 
 // A method to post the image to your own server. Thanks a ton to philho for this
@@ -263,123 +263,6 @@ void post(Timer tim)
     String feedback = du.GetServerFeedback();
     println("----- " + rc + " -----\n" + feedback + "---------------");
   // A flash of white light, like that at the moment of creation. Of a snapshot.
-void onLostUser(int userId)
-{
-  print("Lost the user ");
-  println(userId);
-  kinect.stopTrackingSkeleton(userId);
-  if (nou_old>0) nou_old -=1;
-  print("Number of users ");
-  println(nou_old);
-}
-
-
-void onExitUser(int userId)
-{
-  print("User exit ");
-  println(userId);
-  kinect.stopTrackingSkeleton(userId);
-  if (nou_old>0) nou_old -= 1;
-  print("Number of users ");
-  println(nou_old);
-}
-
-// user-tracking callbacks!
-void onNewUser(int userId) {
-  print("start pose detection for");
-  println(userId);
-  nou_old += 1;
-  print("Number of users ");
-  println(nou_old);
-  //kinect.requestCalibrationSkeleton(userId,true);
-}
-
-// -----------------------------------------------------------------
-// hand events 5
-void onCreateHands(int handId, PVector position, float time) {
-  kinect.convertRealWorldToProjective(position, position);
-  println("Found hands");//handPositions.add(position);
-}
-
-void onUpdateHands(int handId, PVector position, float time) {
-  //kinect.convertRealWorldToProjective(position, position);
-  PVector p = new PVector();
-  if (position.x>kinectWidth*0.8 && position.y>0.75*kinectHeight) 
-  {
-    if (canUpload)
-    {
-      canUpload = false;
-      println("Clicking");
-      fill(255);
-      rect(0,0,width,height);
-      new Poster(1);
-    }
-  }
-  //handPositions.add(position);
-}
-void onDestroyHands(int handId, float time) {
-  //handPositions.clear();
-  kinect.addGesture("RaiseHand");
-}
-// -----------------------------------------------------------------
-// gesture events 6
-void onRecognizeGesture(String strGesture, PVector idPosition, PVector endPosition)
-{
-  println("Recognized Gesture");
-  kinect.startTrackingHands(endPosition);
-  kinect.removeGesture("RaiseHand");
-}
-
-
-void post(Timer tim)
-{
-  DataUpload du = new DataUpload();
-  boolean bOK = false;
-  // Upload the currently displayed image with a fixed name, and the chosen format
-  // We need a new buffered image without the alpha channel
-    fill(255);
-  rect(0, 0, width, height);
-  BufferedImage imageNoAlpha = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
-  loadPixels();
-  imageNoAlpha.setRGB(0, 0, width, height, g.pixels, 0, width);
-  //  BufferedImage dimg = new BufferedImage(width,height,imageNoAlpha.getColorModel().getTransparency());
-  //  Graphics2D g2 = dimg.createGraphics();
-  //  g2.drawImage(imageNoAlpha,0,0,width,height,0,height,width,0,null);
-  //  g2.dispose();
-
-  bOK = du.UploadImage("snapshot.jpeg", imageNoAlpha);
-  if (!bOK)
-    return; // Some problem on Java side. Do nothing
-
-  // Get the answer of the PHP script
-  int rc = du.GetResponseCode();
-  String feedback = du.GetServerFeedback();
-  println("----- " + rc + " -----\n" + feedback + "---------------");
-  fill(255);
-  rect(0, 0, width, height);
-  tim.cancel();
-}
-
-public class Poster {
-  Timer tim;
-
-  public Poster(int seconds) 
-  {
-    tim = new Timer();
-    tim.schedule(new PostTask(), seconds*1000);
-  }
-  class PostTask extends TimerTask {
-
-    public void run() {
-      println("Time's up!");
-      post(tim);
-      //tim.cancel(); //Not necessary because we call System.exit
-      canUpload = true;
-    }
-  }
-}
-
-
     fill(255);
     rect(0,0,width,height);
     tim.cancel(); // Cancel the timer, we are done with it
